@@ -34,7 +34,7 @@
 
 	$buildNumber = $build . '-' . $commit;
 
-    $release = $path.'/'. $buildNumber;
+    $release = $path.'/release-'. $buildNumber;
 @endsetup
 
 @task('init')
@@ -153,14 +153,14 @@
 
 @task('deploymentCleanup')
 	cd {{ $path }}
-	find . -maxdepth 1 -name "20*" | sort | head -n -4 | xargs rm -Rf
+	find . -maxdepth 1 -name "release-*" | sort | head -n -4 | xargs rm -Rf
 	echo "Cleaned up old deployments"
 @endtask
 
 @task('deploymentOptionCleanup')
 	cd {{ $path }}
 	@if (isset($cleanup) && $cleanup)
-		find . -maxdepth 1 -name "20*" | sort | head -n -4 | xargs rm -Rf
+		find . -maxdepth 1 -name "release-*" | sort | head -n -4 | xargs rm -Rf
 		echo "Cleaned up old deployments"
 	@endif
 @endtask
@@ -181,6 +181,6 @@
 
 @task('deploymentRollback')
 	cd {{ $path }}
-	ln -nfs {{ $path }}/$(find . -maxdepth 1 -name "20*" | sort  | tail -n 2 | head -n1) {{ $path }}/current
-	echo "Rolled back to $(find . -maxdepth 1 -name "20*" | sort  | tail -n 2 | head -n1)"
+	ln -nfs {{ $path }}/$(find . -maxdepth 1 -name "release-*" | sort  | tail -n 2 | head -n1) {{ $path }}/current
+	echo "Rolled back to $(find . -maxdepth 1 -name "release-*" | sort  | tail -n 2 | head -n1)"
 @endtask
