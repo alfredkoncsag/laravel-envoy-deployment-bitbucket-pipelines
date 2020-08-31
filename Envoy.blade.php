@@ -1,4 +1,7 @@
+@servers(['web' => $user.'@'.$host])
+
 @setup
+
     if (empty($user)) {
         throw new Exception('ERROR: $user var empty or not defined (DEPLOY_USER)');
     }
@@ -13,7 +16,7 @@
 
     if (empty($repo)) {
         throw new Exception('ERROR: $repo var empty or not defined (BITBUCKET_REPO_FULL_NAME)');
-    }
+	}
 
     if (empty($build)) {
         throw new Exception('ERROR: $build var empty or not defined (BITBUCKET_BUILD_NUMBER)');
@@ -23,52 +26,45 @@
         throw new Exception('ERROR: $commit var empty or not defined (BITBUCKET_COMMIT)');
     }
 
-    if (file_exists($path) || is_writable($path)) {
-        throw new Exception("ERROR: cannot access {$path}");
-    }
-
     $env = isset($env) ? $env : "production";
 
     $branch = isset($branch) ? $branch : "master";
 
-    $path = rtrim($path, '/');
+	$path = rtrim($path, '/');
 
-    $release = $path.'/'. $build . '_' . $commit;
+	$buildNumber = $build . '-' . $commit;
+
+    $release = $path.'/'. $buildNumber;
 @endsetup
-
-@servers([
-	'production' => $user.'@'.$host,
-	'localhost' => '127.0.0.1'
-])
 
 @task('init')
 	if [ ! -d {{ $path }}/current ]; then
 
-		echo "1. Open deploy foleder: \e[32mcd {{ $path }}"
+		echo "1. Open deploy foleder: cd {{ $path }}"
 		cd {{ $path }}
 
-		echo "2. Clone repository: \e[32mgit clone {{ $repo }} --branch={{ $branch }} --depth=1 -q {{ $release }}"
+		echo "2. Clone repository: git clone {{ $repo }} --branch={{ $branch }} --depth=1 -q {{ $release }}"
 		git clone {{ $repo }} --branch={{ $branch }} --depth=1 -q {{ $release }}
 		echo "2.1. Repository cloned"
 
-		echo "3. Move the firsth release storage folder to the project root: \e[32mmv {{ $release }}/storage {{ $path }}/storage"
+		echo "3. Move the firsth release storage folder to the project root: mv {{ $release }}/storage {{ $path }}/storage"
 		mv {{ $release }}/storage {{ $path }}/storage
 
-		echo "4. Create storage symlink: \e[32mln -s {{ $path }}/storage {{ $release }}/storage"
+		echo "4. Create storage symlink: ln -s {{ $path }}/storage {{ $release }}/storage"
 		ln -s {{ $path }}/storage {{ $release }}/storage
 
-		echo "5. Create storage public folder symlink: \e[32mln -s {{ $path }}/storage/public {{ $release }}/public/storage"
+		echo "5. Create storage public folder symlink: ln -s {{ $path }}/storage/public {{ $release }}/public/storage"
 		ln -s {{ $path }}/storage/public {{ $release }}/public/storage
 		echo "5.1. Storage directory set up"
 
-		echo "6. Move .env file to the project root: \e[32mcp {{ $release }}/.env.example {{ $path }}/.env"
+		echo "6. Move .env file to the project root: cp {{ $release }}/.env.example {{ $path }}/.env"
 		cp {{ $release }}/.env.example {{ $path }}/.env
 
-		echo "7. Create .env symlink: \e[32mln -s {{ $path }}/.env {{ $release }}/.env"
+		echo "7. Create .env symlink: ln -s {{ $path }}/.env {{ $release }}/.env"
 		ln -s {{ $path }}/.env {{ $release }}/.env
 		echo "7.1. Environment file set up"
 
-		echo "8. Delete init release folder: \e[32mrm -rf {{ $release }}"
+		echo "8. Delete init release folder: rm -rf {{ $release }}"
 		rm -rf {{ $release }}
 
 		echo "---------------------------------------------------------------------------------------------------------------------------"
@@ -81,6 +77,7 @@
 @story('deploy')
 	deploymentStart
 	deploymentLinks
+    deploymentNode
 	deploymentComposer
 	deploymentMigrate
 	deploymentCache
@@ -92,6 +89,7 @@
 @story('deployCleanup')
 	deploymentStart
 	deploymentLinks
+    deploymentNode
 	deploymentComposer
 	deploymentMigrate
 	deploymentCache
@@ -107,7 +105,7 @@
 
 @task('deploymentStart')
 	cd {{ $path }}
-	echo "Deployment ({{ $date }}) started"
+	echo "Deployment ({{ $buildNumber }}) started"
 	git clone {{ $repo }} --branch={{ $branch }} --depth=1 -q {{ $release }}
 	echo "Repository cloned"
 @endtask
@@ -120,6 +118,13 @@
 	echo "Storage directories set up"
 	ln -s {{ $path }}/.env {{ $release }}/.env
 	echo "Environment file set up"
+@endtask
+
+@task('deploymentNode')
+    echo "Installing npm depencencies..."
+    cd {{ $release }}
+	npm install
+	npm run production
 @endtask
 
 @task('deploymentComposer')
@@ -143,7 +148,7 @@
 	php {{ $release }}/artisan queue:restart --quiet
 	echo "Queue restarted"
 	ln -nfs {{ $release }} {{ $path }}/current
-	echo "Deployment ({{ $date }}) finished"
+	echo "Deployment ({{ $buildNumber }}) finished"
 @endtask
 
 @task('deploymentCleanup')
