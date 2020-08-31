@@ -1,6 +1,6 @@
 # Laravel Continuous Integration & Delivery with Bitbucket Pipelines
 
-Continuous Integration & Delivery solution for a Laravel PHP Application using Bitbucket Pipelines.
+Continuous Integration & Deployment solution for a Laravel PHP Application using Bitbucket Pipelines.
 
 This repository includes:
 
