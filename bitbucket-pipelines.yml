@@ -82,7 +82,9 @@ pipelines:
               name: akoncsag/php:deploy
             script:
               # Remote server task runner
-              - envoy run deploy --host=$DEPLOY_HOST --user=$DEPLOY_USER --path=$DEPLOY_PATH --build=$BITBUCKET_BUILD_NUMBER --commit=$BITBUCKET_COMMIT --branch=$BITBUCKET_BRANCH --php=php --dir=$BITBUCKET_CLONE_DIR
+              - envoy run deploy --user=$DEPLOY_USER --host=$DEPLOY_HOST --path=$DEPLOY_PATH --repo=$BITBUCKET_REPO_FULL_NAME --build=$BITBUCKET_BUILD_NUMBER --commit=$BITBUCKET_COMMIT --branch=$BITBUCKET_BRANCH --php=php
+  
+  
   # You might want to create and access a service (like a database) as part
   # of your Pipeline workflow. You can do so by defining it as a service here.
   definitions:

@@ -1,54 +1,77 @@
 @setup
-	
-	if (empty($host)) {
-		throw new Exception('ERROR: $host var empty or not defined');
-	}
-
-	if (empty($user)) {
-		throw new Exception('ERROR: $user var empty or not defined');
+    if (empty($user)) {
+        throw new Exception('ERROR: $user var empty or not defined (DEPLOY_USER)');
     }
-	
-	if (empty($path)) {
-		throw new Exception('ERROR: $path var empty or not defined');
-	}
-	
-	if (empty($build)) {
-		throw new Exception('ERROR: $build var empty or not defined');
-	}
-	
-	if (empty($commit)) {
-		throw new Exception('ERROR: $commit var empty or not defined');
-	}
-	
-	if (file_exists($path) || is_writable($path)) {
-		throw new Exception("ERROR: cannot access {$path}");
-	}
-	
-	$current_release_dir = $path . '/current';
-    $releases_dir = $path . '/releases';
-    $new_release_dir = $releases_dir . '/' . $build . '_' . $commit;
 
-    $remote = $user . '@' . $host . ':' . $new_release_dir;
+    if (empty($host)) {
+        throw new Exception('ERROR: $host var empty or not defined (DEPLOY_HOST)');
+    }
 
-    // Command or path to invoke PHP
-    $php = empty($php) ? 'php' : $php;
+    if (empty($path)) {
+        throw new Exception('ERROR: $path var empty or not defined (DEPLOY_PATH)');
+    }
+
+    if (empty($repo)) {
+        throw new Exception('ERROR: $repo var empty or not defined (BITBUCKET_REPO_FULL_NAME)');
+    }
+
+    if (empty($build)) {
+        throw new Exception('ERROR: $build var empty or not defined (BITBUCKET_BUILD_NUMBER)');
+    }
+
+    if (empty($commit)) {
+        throw new Exception('ERROR: $commit var empty or not defined (BITBUCKET_COMMIT)');
+    }
+
+    if (file_exists($path) || is_writable($path)) {
+        throw new Exception("ERROR: cannot access {$path}");
+    }
+
+    $env = isset($env) ? $env : "production";
+
+    $branch = isset($branch) ? $branch : "master";
+
+    $path = rtrim($path, '/');
+
+    $release = $path.'/'. $build . '_' . $commit;
 @endsetup
 
-@servers(['web' => $user.'@'.$host, 'localhost' => '127.0.0.1'])
+@servers([
+	'production' => $user.'@'.$host,
+	'localhost' => '127.0.0.1'
+])
 
 @task('init')
 	if [ ! -d {{ $path }}/current ]; then
+
+		echo "1. Open deploy foleder: \e[32mcd {{ $path }}"
 		cd {{ $path }}
+
+		echo "2. Clone repository: \e[32mgit clone {{ $repo }} --branch={{ $branch }} --depth=1 -q {{ $release }}"
 		git clone {{ $repo }} --branch={{ $branch }} --depth=1 -q {{ $release }}
-		echo "Repository cloned"
+		echo "2.1. Repository cloned"
+
+		echo "3. Move the firsth release storage folder to the project root: \e[32mmv {{ $release }}/storage {{ $path }}/storage"
 		mv {{ $release }}/storage {{ $path }}/storage
+
+		echo "4. Create storage symlink: \e[32mln -s {{ $path }}/storage {{ $release }}/storage"
 		ln -s {{ $path }}/storage {{ $release }}/storage
+
+		echo "5. Create storage public folder symlink: \e[32mln -s {{ $path }}/storage/public {{ $release }}/public/storage"
 		ln -s {{ $path }}/storage/public {{ $release }}/public/storage
-		echo "Storage directory set up"
+		echo "5.1. Storage directory set up"
+
+		echo "6. Move .env file to the project root: \e[32mcp {{ $release }}/.env.example {{ $path }}/.env"
 		cp {{ $release }}/.env.example {{ $path }}/.env
+
+		echo "7. Create .env symlink: \e[32mln -s {{ $path }}/.env {{ $release }}/.env"
 		ln -s {{ $path }}/.env {{ $release }}/.env
-		echo "Environment file set up"
+		echo "7.1. Environment file set up"
+
+		echo "8. Delete init release folder: \e[32mrm -rf {{ $release }}"
 		rm -rf {{ $release }}
+
+		echo "---------------------------------------------------------------------------------------------------------------------------"
 		echo "Deployment path initialised. Run 'envoy run deploy' now."
 	else
 		echo "Deployment path already initialised (current symlink exists)!"
@@ -56,40 +79,40 @@
 @endtask
 
 @story('deploy')
-	deployment_start
-	deployment_links
-	deployment_composer
-	deployment_migrate
-	deployment_cache
-	deployment_finish
-	health_check
-	deployment_option_cleanup
+	deploymentStart
+	deploymentLinks
+	deploymentComposer
+	deploymentMigrate
+	deploymentCache
+	deploymentFinish
+	healthCheck
+	deploymentOptionCleanup
 @endstory
 
-@story('deploy_cleanup')
-	deployment_start
-	deployment_links
-	deployment_composer
-	deployment_migrate
-	deployment_cache
-	deployment_finish
-	health_check
-	deployment_cleanup
+@story('deployCleanup')
+	deploymentStart
+	deploymentLinks
+	deploymentComposer
+	deploymentMigrate
+	deploymentCache
+	deploymentFinish
+	healthCheck
+	deploymentCleanup
 @endstory
 
 @story('rollback')
-	deployment_rollback
-	health_check
+	deploymentRollback
+	healthCheck
 @endstory
 
-@task('deployment_start')
+@task('deploymentStart')
 	cd {{ $path }}
 	echo "Deployment ({{ $date }}) started"
 	git clone {{ $repo }} --branch={{ $branch }} --depth=1 -q {{ $release }}
 	echo "Repository cloned"
 @endtask
 
-@task('deployment_links')
+@task('deploymentLinks')
 	cd {{ $path }}
 	rm -rf {{ $release }}/storage
 	ln -s {{ $path }}/storage {{ $release }}/storage
@@ -99,37 +122,37 @@
 	echo "Environment file set up"
 @endtask
 
-@task('deployment_composer')
+@task('deploymentComposer')
 	echo "Installing composer depencencies..."
 	cd {{ $release }}
 	composer install --no-interaction --quiet --no-dev --prefer-dist --optimize-autoloader
 @endtask
 
-@task('deployment_migrate')
+@task('deploymentMigrate')
 	php {{ $release }}/artisan migrate --env={{ $env }} --force --no-interaction
 @endtask
 
-@task('deployment_cache')
+@task('deploymentCache')
 	php {{ $release }}/artisan view:clear --quiet
 	php {{ $release }}/artisan cache:clear --quiet
 	php {{ $release }}/artisan config:cache --quiet
 	echo "Cache cleared"
 @endtask
 
-@task('deployment_finish')
+@task('deploymentFinish')
 	php {{ $release }}/artisan queue:restart --quiet
 	echo "Queue restarted"
 	ln -nfs {{ $release }} {{ $path }}/current
 	echo "Deployment ({{ $date }}) finished"
 @endtask
 
-@task('deployment_cleanup')
+@task('deploymentCleanup')
 	cd {{ $path }}
 	find . -maxdepth 1 -name "20*" | sort | head -n -4 | xargs rm -Rf
 	echo "Cleaned up old deployments"
 @endtask
 
-@task('deployment_option_cleanup')
+@task('deploymentOptionCleanup')
 	cd {{ $path }}
 	@if (isset($cleanup) && $cleanup)
 		find . -maxdepth 1 -name "20*" | sort | head -n -4 | xargs rm -Rf
@@ -138,8 +161,8 @@
 @endtask
 
 
-@task('health_check')
-	@if (!empty($healthUrl) )
+@task('healthCheck')
+	@if (!empty($healthUrl))
 		if [ "$(curl --write-out "%{http_code}\n" --silent --output /dev/null {{ $healthUrl }})" == "200" ]; then
 			printf "\033[0;32mHealth check to {{ $healthUrl }} OK\033[0m\n"
 		else
@@ -151,9 +174,8 @@
 @endtask
 
 
-@task('deployment_rollback')
+@task('deploymentRollback')
 	cd {{ $path }}
 	ln -nfs {{ $path }}/$(find . -maxdepth 1 -name "20*" | sort  | tail -n 2 | head -n1) {{ $path }}/current
 	echo "Rolled back to $(find . -maxdepth 1 -name "20*" | sort  | tail -n 2 | head -n1)"
 @endtask
-
