@@ -80,22 +80,10 @@
     deploymentNode
 	deploymentComposer
 	deploymentMigrate
-	deploymentCache
+	deploymentOptimize
 	deploymentFinish
 	healthCheck
 	deploymentOptionCleanup
-@endstory
-
-@story('deployCleanup')
-	deploymentStart
-	deploymentLinks
-    deploymentNode
-	deploymentComposer
-	deploymentMigrate
-	deploymentCache
-	deploymentFinish
-	healthCheck
-	deploymentCleanup
 @endstory
 
 @story('rollback')
@@ -137,11 +125,9 @@
 	php {{ $release }}/artisan migrate --env={{ $env }} --force --no-interaction
 @endtask
 
-@task('deploymentCache')
-	php {{ $release }}/artisan view:clear --quiet
-	php {{ $release }}/artisan cache:clear --quiet
-	php {{ $release }}/artisan config:cache --quiet
-	echo "Cache cleared"
+@task('deploymentOptimize')
+	echo '* Clearing cache and optimising *'
+	php {{ $release }}/artisan optimize --quiet
 @endtask
 
 @task('deploymentFinish')
@@ -151,12 +137,6 @@
 	echo "Deployment ({{ $buildNumber }}) finished"
 @endtask
 
-@task('deploymentCleanup')
-	cd {{ $path }}
-	find . -maxdepth 1 -name "release-*" | sort | head -n -4 | xargs rm -Rf
-	echo "Cleaned up old deployments"
-@endtask
-
 @task('deploymentOptionCleanup')
 	cd {{ $path }}
 	@if (isset($cleanup) && $cleanup)
@@ -164,7 +144,6 @@
 		echo "Cleaned up old deployments"
 	@endif
 @endtask
-
 
 @task('healthCheck')
 	@if (!empty($healthUrl))
@@ -177,7 +156,6 @@
 		echo "No health check set"
 	@endif
 @endtask
-
 
 @task('deploymentRollback')
 	cd {{ $path }}
